@@ -20,48 +20,18 @@ def write_csv(df):
 
 #Get orderbook from DataPath, return orderbook data and status code.
 #If response fail, return None
-def get_response(url, type):
-    if type == 'orderbook':
-        try:
-            response = session.get(DataPath_order, verify = False, timeout = 1, allow_redirects = True)
-            response_data = response.json()["data"]
-            response_status = response.status_code
-        except:
-            return None, "Response Error"
+def get_response(url):
+    try:
+        response = session.get(DataPath_order, verify = False, timeout = 1, allow_redirects = True)
+        response_data = response.json()["data"]
+        response_status = response.status_code
+    except:
+        return None, "Response Error"
         
-        return response_data, response_status
-    if type == 'trade':
-        try:
-            response = session.get(DataPath_trade, verify = False, timeout = 1, allow_redirects = True)
-            response_data = response.json()["data"]
-            response_status = response.status_code
-        except:
-            return None, "Response Error"
-        
-        return response_data, response_status
-
-def find_start(df1, df2):
-    last_point = df2.head(1)
-    df_check = pd.concat([df1, last_point])
-    start_point = df_check.index[(df_check.duplicated(keep = 'last') == True)].tolist()
-    return start_point[0]
-
-data_trade_last = pd.DataFrame(columns = ['tranaction_date', 'type', 'units_traded', 'price', 'total'])
-def get_trade(res_time):
-    data_trade, status_trade = get_response(DataPath_trade, 'trade')
-    if data_trade is None:
-        return status_trade
-    if data_trade_last.empty():
-        end_point = 50
-    else:
-        end_point = find_start(data_trade, data_trade_last)
-    data_trade_last = data_trade
-    data_trade_new = data_trade[0:end_point]
-    df_bid = data_trade_new.loc[data_trade_new["type"]==0,:]
-    df_ask = data_trade_new.loc[data_trade_new["type"]==1,:]
+    return response_data, response_status
 
 def get_order(res_time):
-    data_order, status_order = get_response(DataPath_order, 'orderbook')
+    data_order, status_order = get_response(DataPath_order)
     if data_order is None:
         return status_order
     df_bid = pd.DataFrame(data_order["bids"]).sort_values(by = "price", ascending = False)
@@ -74,7 +44,7 @@ def get_order(res_time):
     write_csv(df)
     return status_order
 
-def get_orderbook_trade():
+def get_orderbook():
     time_start = datetime.now()
     time_last = time_start
     time_now = time_start
@@ -95,13 +65,11 @@ def get_orderbook_trade():
         else:
             print("Orderbook : ", ((time_now - time_start).total_seconds()/86400)*100, "% is done.")
             print("Response status is " + str(status) + ", Response time is " + response_time)
-            
-        #status_trade = get_trade(response_time)
 
 #Decide what currency and how many lines to get orderbook
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--currency", help = "what crypto currency to get", choices = ['BTC'], dest = "currency", action = "store")
+    parser.add_argument("--currency", help = "what crypto currency to get", choices = ['BTC', 'ETH'], dest = "currency", action = "store")
     parser.add_argument("--count", help = "how many orderbook lines to get", choices = ['5', '10'], dest = "count", action = "store")
     
     return parser.parse_args()
@@ -131,7 +99,6 @@ timestamp = ''
 curency = ''
 count = ''
 DataPath_order = ''
-DataPath_trade = ''
 session = init_session()
 
 def main():
@@ -140,15 +107,13 @@ def main():
     global currency
     global count
     global DataPath_order
-    global DataPath_trade
     
     args = parse_args()
     currency = args.currency
     count = args.count
     DataPath_order = 'https://api.bithumb.com/public/orderbook/' + currency + '_KRW/?count=' + count
-    DataPath_trade = 'https://api.bithumb.com/public/transaction_history/' + currency + '_KRW/?count=50'
     
-    get_orderbook_trade()
+    get_orderbook()
     
     session.close()
     
