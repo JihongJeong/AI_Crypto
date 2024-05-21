@@ -1,6 +1,7 @@
 import pandas as pd
 import polars as pl
 import numpy as np
+import glob
 
 def GetMidPrice(orderbook):
     # bid/ask devide
@@ -126,37 +127,41 @@ def BookDelta(orderbook, ratio, interval):
     
     return book_d.select(pl.col(['timestamp', 'book-delta-{:.1f}-5-{}'.format(ratio, interval)]))
 
-PATH = "./" 
   
 def main():
+    PATH = "./" 
     pl.Config(set_fmt_float = "full")
-    global PATH
-    
-    # load orderbook
-    orderbook = pl.read_csv(PATH + "book-2024-04-09-exchange-market.csv")
-    
-    # get mid price
-    mid_price = GetMidPrice(orderbook)
-    mid_price_type = ['midprice', 'midprice_mean', 'midprice_mkt']
-    
-    # initialize features using mid price
-    features = mid_price
-    
-    # calculate book imabalance with (random) ratios and each mid price
-    ratios = np.round(np.random.rand(3), 2) # ratios = [0.1, 0.2, 0.5]
-    for mid_type in mid_price_type:
-        for ratio in ratios:
-            book_imbalance = BookImbalance(orderbook, ratio, 1, mid_price, mid_type)
-            features = pl.concat([features, book_imbalance], how = 'align')
-    
-    # calculate book imabalance with ratio
-    ratio_d = [0.1, 0.2, 0.5]
-    for ratio in ratio_d:
-        book_delta = BookDelta(orderbook, ratio, 1)
-        features = pl.concat([features, book_delta], how = 'align')
 
-    # export features to csv file
-    features.write_csv(PATH + "2024-04-09-exchange-market-feature.csv")
+    # from data 'PATH' bring all orderbook dataset names
+    orderbook_list = glob.glob(PATH + 'book*.csv')
+    
+    # for each orderbook dataset
+    for orderbook_name in orderbook_list:
+        # load orderbook
+        orderbook = pl.read_csv(orderbook_name)
+
+        # get mid price
+        mid_price = GetMidPrice(orderbook)
+        mid_price_type = ['midprice', 'midprice_mean', 'midprice_mkt']
+        
+        # initialize features using mid price
+        features = mid_price
+        
+        # calculate book imabalance with (random) ratios and each mid price
+        ratios = np.round(np.random.rand(3), 2) # ratios = [0.1, 0.2, 0.5]
+        for mid_type in mid_price_type:
+            for ratio in ratios:
+                book_imbalance = BookImbalance(orderbook, ratio, 1, mid_price, mid_type)
+                features = pl.concat([features, book_imbalance], how = 'align')
+        
+        # calculate book imabalance with ratio
+        ratio_d = [0.1, 0.2, 0.5]
+        for ratio in ratio_d:
+            book_delta = BookDelta(orderbook, ratio, 1)
+            features = pl.concat([features, book_delta], how = 'align')
+
+        # export features to csv file
+        features.write_csv(orderbook_name[7:-4] + "-feature.csv")
 
 if __name__ == '__main__':
     main()
